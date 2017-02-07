@@ -6,25 +6,41 @@ function insertAt(string, index, substring) {
     return string.substr(0, index) + substring + string.substr(index);
 }
 
+Array.prototype.remove = function (from, to) {
+    var rest = this.slice((to || from) + 1 || this.length);
+    this.length = from < 0 ? this.length + from : from;
+    return this.push.apply(this, rest);
+};
+
 Highlight = {
+    _highlightContainers: [],
+    clearHighlightContainers: function () {
+        console.warn("Cleaning containers...");
+        $(".mab-hl-highlights-container").html("");
+    },
     recalculate: function () {
         console.log("Highlight - recalculate started");
         var start = new Date();
 
-        for (var textSelector in Highlight._highlightContainers) {
-            if (Highlight._highlightContainers.hasOwnProperty(textSelector)) {
-                Highlight.appendHighlights(textSelector);
-            }
+        Highlight.clearHighlightContainers();
+
+        for (var index = 0; index < Highlight._highlightContainers.length; index++) {
+            Highlight.appendHighlights(index);
         }
         var end = new Date();
         console.log("Highlight - recalculation completed after " + (end - start) / 1000 + " seconds");
     },
-    appendHighlights: function (textSelector) {
+    appendHighlights: function (index) {
+        var obj = Highlight._highlightContainers[index];
+        var id = obj.id;
+        var textSelector = obj.selector;
+        var color = obj.color;
         var originalTextEl = $(textSelector);
-        var anchors = originalTextEl.find(".mab-hl-text-anchor");
+        var anchors = originalTextEl.find(".mab-hl-text-anchor[data-id-highlight='" + id + "']");
         var generalContainer = $(originalTextEl).closest('.mab-hl-container');
         var highlightsContainer = generalContainer.find(".mab-hl-highlights-container");
-        highlightsContainer.html("");
+
+        console.warn("Recalc for id " + id);
 
         var originalTextPaddingTop = parseInt(originalTextEl.css("padding-top"));
         var originalTextMarginTop = parseInt(originalTextEl.css("margin-top"));
@@ -46,10 +62,10 @@ Highlight = {
         anchors.each(function () {
 
             var span = $("<span tabindex='0'" +
-                "data-toggle='tooltip' " +
+                (this.dataset.replace ? "data-toggle='tooltip' " : " ") +
                 "title='" + this.dataset.replace + "' " +
                 "class='mab-hl-text-highlight' " +
-                "style='top: " + (this.offsetTop - originalTextOffsetTop) + "px; margin-left: " + (this.offsetLeft - originalTextOffsetLeft) + "px;'>" +
+                "style='background-color: " + color + "; top: " + (this.offsetTop - originalTextOffsetTop) + "px; margin-left: " + (this.offsetLeft - originalTextOffsetLeft) + "px;'>" +
                 this.dataset.match +
                 "</span>");
             var el = newBaseHighlightContainer
@@ -72,20 +88,40 @@ Highlight = {
      *       matches: [{match, matchExpression, tooltipText},...]
 
      */
+    repositionAnchorsOnContainer: function (selector) {
+
+    },
     highlight: function (params) {
-        var container = params.textContainerSelector;
+        var selector = params.textContainerSelector;
         var matches = params.matches;
-        var containerEl = $(container);
+        var containerEl = $(selector);
         var regExpMatches = [];
-        var texto = containerEl.html();
-        containerEl.addClass('mab-hl-text-container');
-        containerEl.wrap("<div class='mab-hl-container'></div>");
-        containerEl.after("<div class='mab-hl-highlights-container'></div>");
+        var id = params.id;
+        var color = params.color ? params.color : 'rgb(114, 184, 255)';
+        var newCharCount = 0;
+        var containerHasHighlights = containerEl.hasClass('mab-hl-text-container');
+
+        if (id){
+            Highlight._highlightContainers.remove(id);
+        }
+
+        if (!containerHasHighlights) {
+            console.log("Creating new highlight...");
+            containerEl.addClass('mab-hl-text-container');
+            containerEl.wrap("<div class='mab-hl-container'></div>");
+            containerEl.after("<div class='mab-hl-highlights-container'></div>");
+            containerEl.data('mabHlOriginalText', containerEl.html());
+        } else {
+            console.log("Altering existing highlight...");
+        }
+        var originalText = containerEl.data('mabHlOriginalText');
+        var newText = originalText;
 
 
         console.warn("bug de match nas ÂNCORAS dependendo da expressão");
         console.warn("isso assume que o texto É IMUTÁVEL, visto que as posições são gravadas somente 1x");
-        for (var i=0;i<matches.length;i++) {
+
+        for (var i = 0; i < matches.length; i++) {
             var m = matches[i];
 
             //var objMatch = matches[i];
@@ -94,26 +130,58 @@ Highlight = {
             var pattern = new RegExp(m.match, 'g');
             var match;
 
-            while (match = pattern.exec(texto)) {
+            while (match = pattern.exec(originalText)) {
                 regExpMatches.push({
                     match: match[0],
                     index: match.index,
-                    replace: m.tooltipText
+                    replace: (m.tooltipText ? m.tooltipText : null),
                 });
             }
         }
 
 
-        regExpMatches.sort(function (a, b) {
+        if (!id) { // if not mentioned, generates new id
+            id = Highlight._highlightContainers.length;
+        }
+
+        var regExpMatchesToAnchor = regExpMatches;
+        for (var x = 0; x < regExpMatchesToAnchor.length; x++) {
+            regExpMatchesToAnchor[x].id = id;
+        }
+
+
+        if (containerHasHighlights) {
+            console.warn("Container already has highlights; merging with previous matches to reposition anchors");
+            var sharedObjects = Highlight._highlightContainers.filter(function (obj) {
+                return obj.selector == selector;
+            })
+
+            if (sharedObjects) {
+                for (var idx = 0; idx < sharedObjects.length; idx++) {
+                    var obj = sharedObjects[idx];
+                    var otherMatches = obj.matches;
+                    var otherId = obj.id;
+                    for (var x = 0; x < otherMatches.length; x++) {
+                        otherMatches[x].id = otherId;
+                    }
+                    regExpMatchesToAnchor = regExpMatches.concat(otherMatches);
+                }
+            }
+            //must reposition anchors from other highlight objects
+
+        }
+
+        regExpMatchesToAnchor.sort(function (a, b) {
             return a.index - b.index;
         });
-        var newCharCount = 0;
-        var newText = texto;
-        for (var i = 0; i < regExpMatches.length; i++) {
-            var r = regExpMatches[i];
+
+
+        for (var i = 0; i < regExpMatchesToAnchor.length; i++) {
+            var r = regExpMatchesToAnchor[i];
             var newSpan = "<span class='mab-hl-text-anchor' " +
+                "data-id-highlight='" + r.id + "' " +
                 "data-match='" + r.match + "' " +
-                "data-replace='" + r.replace + "'></span>";
+                (r.replace?"data-replace='" + r.replace:'') + "'></span>";
             newText = insertAt(newText, r.index + newCharCount, newSpan);
             newCharCount += newSpan.length;
         }
@@ -122,16 +190,17 @@ Highlight = {
 
         console.log("Total matches: " + regExpMatches.length);
         console.log(regExpMatches);
-        // lembrar de ordenar por posição pra facilitar a vida
 
 
-        Highlight._highlightContainers[container] = regExpMatches;
+        Highlight._highlightContainers.push({
+            id: id,
+            selector: selector,
+            matches: regExpMatches,
+            color: color,
+        });
 
         Highlight.recalculate();
+        return id;
     },
-    _highlightContainers: {}
-
-
 }
-
 
