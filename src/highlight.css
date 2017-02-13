@@ -1,37 +1,18 @@
-.mab-hl-container {
+.mab-hl-highlight-wrapper{
     position: relative;
-    border: 1px solid lightgrey;
-    pointer-events: none;
-    z-index: 0;
 }
 
-.mab-hl-highlights-container {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    z-index: -1;
-}
-
-.mab-hl-text-anchor {
-    display: inline;
-    position: absolute;
-}
-
-.mab-hl-highlight-container {
-    position: absolute;
-    pointer-events: none;
-}
-
-.mab-hl-highlight-container .mab-hl-text-highlight {
-    color: transparent;
-    position: relative;
+.mab-hl-highlight-wrapper .mab-hl-highlight{
     opacity: 0.6;
     transition: all 300ms ease;
-    pointer-events: all;
+    position: absolute;
+    z-index: -1;
+    left: 0;top:0;width: 100%;height:100%;
 }
 
-.mab-hl-text-highlight:hover, .mab-hl-text-highlight:active, .mab-hl-text-highlight:focus {
+.mab-hl-highlight-wrapper:hover .mab-hl-highlight,
+.mab-hl-highlight-wrapper:active .mab-hl-highlight,
+.mab-hl-highlight-wrapper:focus .mab-hl-highlight{
     opacity: 1;
+
 }
