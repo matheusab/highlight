@@ -1,18 +1,3 @@
-.mab-hl-highlight-wrapper{
-    position: relative;
-}
-
-.mab-hl-highlight-wrapper .mab-hl-highlight{
-    opacity: 0.6;
-    transition: all 300ms ease;
-    position: absolute;
-    z-index: -1;
-    left: 0;top:0;width: 100%;height:100%;
-}
-
-.mab-hl-highlight-wrapper:hover .mab-hl-highlight,
-.mab-hl-highlight-wrapper:active .mab-hl-highlight,
-.mab-hl-highlight-wrapper:focus .mab-hl-highlight{
-    opacity: 1;
-
+.mab-hl-highlight{
+    transition: all 200ms ease;
 }

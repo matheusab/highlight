@@ -2,6 +2,8 @@
  * Created by bxo on 31/01/2017.
  */
 
+
+
 function insertAt(string, index, substring) {
     return string.substr(0, index) + substring + string.substr(index);
 }
@@ -51,70 +53,7 @@ function findWithAttr(array, attr, value, isArray) {
 
 Highlight = {
     _highlightContainers: [],
-    clearHighlightContainers: function () {
-        console.warn("Cleaning containers...");
-        $(".mab-hl-highlights-container").html("");
-    },
-    recalculate: function () {
-        console.log("Highlight - recalculate started");
-        var start = new Date();
-
-        Highlight.clearHighlightContainers();
-
-        for (var index = 0; index < Highlight._highlightContainers.length; index++) {
-            Highlight.appendHighlights(index);
-        }
-        var end = new Date();
-        console.log("Highlight - recalculation completed after " + (end - start) / 1000 + " seconds");
-    },
-    appendHighlights: function (index) {
-        var obj = Highlight._highlightContainers[index];
-        var id = obj.id;
-        var textSelector = obj.selector;
-        var color = obj.color;
-        var originalTextEl = $(textSelector);
-        var anchors = originalTextEl.find(".mab-hl-text-anchor[data-id-highlight='" + id + "']");
-        var generalContainer = $(originalTextEl).closest('.mab-hl-container');
-        var highlightsContainer = generalContainer.find(".mab-hl-highlights-container");
-
-        console.warn("Recalc for id " + id);
-
-        var originalTextPaddingTop = parseInt(originalTextEl.css("padding-top"));
-        var originalTextMarginTop = parseInt(originalTextEl.css("margin-top"));
-        var originalTextBorderTop = parseInt(originalTextEl.css("border-top"));
-
-        var originalTextPaddingLeft = parseInt(originalTextEl.css("padding-left"));
-        var originalTextMarginLeft = parseInt(originalTextEl.css("margin-left"));
-        var originalTextBorderLeft = parseInt(originalTextEl.css("border-left"));
-        //todo check if not NaN
-        var originalTextOffsetTop = originalTextBorderTop + originalTextMarginTop + originalTextPaddingTop;
-        var originalTextOffsetLeft = originalTextBorderLeft + originalTextMarginLeft + originalTextPaddingLeft;
-
-        var newBaseHighlightContainer = originalTextEl.clone();
-        newBaseHighlightContainer.html("");
-        newBaseHighlightContainer
-            .removeAttr("id")
-            .removeClass("mab-hl-text-container")
-            .addClass('mab-hl-highlight-container');
-        anchors.each(function () {
-
-            var span = $("<span tabindex='0'" +
-                (this.dataset.replace ? "data-toggle='tooltip' " : " ") +
-                "title='" + this.dataset.replace + "' " +
-                "class='mab-hl-highlight-wrapper' " +
-                "style='background-color: " + color + "; top: " + (this.offsetTop - originalTextOffsetTop) + "px; margin-left: " + (this.offsetLeft - originalTextOffsetLeft) + "px;'>" +
-                this.dataset.match +
-                "</span>");
-            var el = newBaseHighlightContainer
-                .clone()
-                .append(span);
-            highlightsContainer.append(el);
-
-        });
-
-        generalContainer.find('[data-toggle="tooltip"]').tooltip({html: true});
-
-    },
+    _colorClassMap: [],
 
     /**
      *
@@ -134,14 +73,19 @@ Highlight = {
         var containerEl = $(selector);
         var regExpMatches = [];
         var id = params.id;
+        var verbose = params.debug;
         //TODO talvez tenha que alterar a forma como a cor é criada. E como calculá-la?
         var containerHasHighlights = containerEl.hasClass('mab-hl-container');
         if (!containerHasHighlights) {
-            console.log("Creating new highlight...");
+            if (verbose) {
+                console.log("Creating new highlight...");
+            }
             containerEl.addClass('mab-hl-container');
             containerEl.data('mabHlOriginalText', containerEl.html());
         } else {
-            console.log("Altering existing highlight...");
+            if (verbose) {
+                console.log("Altering existing highlight...");
+            }
         }
         var originalText = containerEl.data('mabHlOriginalText');
         var newText = originalText;
@@ -179,13 +123,17 @@ Highlight = {
         newHighlightObject.matches = regExpMatches;
         Highlight._highlightContainers[id] = newHighlightObject;
 
-
-        console.warn("Container already has highlights; merging with previous matches to reposition anchors");
+        if (verbose) {
+            console.warn("Container already has highlights; merging with previous matches to reposition anchors");
+        }
         var highlightObjects = Highlight._highlightContainers.filter(function (obj) {
             return obj.selector == selector;
         });
 
-        console.warn("bug de match nas ÂNCORAS dependendo da expressão");
+        if (verbose) {
+
+            console.warn("bug de match nas ÂNCORAS dependendo da expressão");
+        }
 
 
         // now, if the same container already has highlights, I should merge these with them
@@ -224,46 +172,55 @@ Highlight = {
          */
 
 
-        var arrNovo = [];
+        var newArray = [];
 
         Object.keys(referencesPerCharIndex).map(function (textIndex) {
             // first the key for the matches on a character of the text (index) is found or created
             var value = referencesPerCharIndex[textIndex];
 
-            var id = findWithAttr(arrNovo, 'matches', value, true);
-            if (id == -1) {
-                id = arrNovo.push({
+            // since the indexes must be sequential, if the last value form the array has the same value
+            // it means it will be part of the same highlight
+            var id = newArray.length - 1;
+            if (id == -1 || !newArray[id].matches.equals(value)) {
+                id = newArray.push({
                         indexes: [],
                         matches: value
                     }) - 1;
             }
             // and then the index for the combination of matches is added
-            arrNovo[id].indexes.push(parseInt(textIndex));
+            newArray[id].indexes.push(parseInt(textIndex));
         });
 
-        /*highlightObjects.sort(function (a, b) {
-         return a.index - b.index;
-         });*/
-        for (var i = 0; i < arrNovo.length; i++) {
-            var a = arrNovo[i];
-            var finalRGB = getColorFromName(matches[0].highlight.color);
-            if (a.matches.length > 1) {
-                for (var y = 1; y < a.matches.length; y++) {
-                    finalRGB = mid(finalRGB, getColorFromName(a.matches[y].highlight.color));
+
+        for (var i = 0; i < newArray.length; i++) {
+            var map = newArray[i];
+            var colorClassName = Highlight.getColorClass(map)
+
+
+            var start = Math.min.apply(null, map.indexes);
+            var end = Math.max.apply(null, map.indexes) + 1;
+
+
+            var singleTooltip = '',
+                tooltipAttr = '';
+
+
+            map.matches.map(function (m) {
+                if (tooltipAttr != '') {
+                    tooltipAttr += '<br>-----------<br>';
                 }
-            }
-            var finalColor = 'rgb(' + finalRGB.join(',') + ')';
-
-            var start = Math.min.apply(null, a.indexes);
-            var end = Math.max.apply(null, a.indexes) + 1;
-
-
-            var singleTooltip = '';
-            if (a.matches.length == 1) {
-                singleTooltip = " title='" + a.matches[0].replace + "' data-toggle='tooltip' ";
+                if (m.replace != '') {
+                    tooltipAttr += m.replace;
+                }
+            });
+            if (tooltipAttr) {
+                singleTooltip = " title='" + tooltipAttr + "' data-toggle='tooltip' ";
             }
 
-            var newSpan = "<span tabindex='0' class='mab-hl-highlight-wrapper' " + singleTooltip + "><span class='mab-hl-highlight'  style='background-color: " + finalColor + "'></span>";
+
+            //console.log(i + ") " + (newText.substr(start + newCharCount, (end - start))));
+
+            var newSpan = "<span tabindex='0' class='mab-hl-highlight " + colorClassName + "' " + singleTooltip + ">";
             //(r.replace ? "data-replace='" + r.replace + "'" : '') + ">";
             var newSpanClose = "</span>";
             newText = insertAt(newText, start + newCharCount, newSpan);
@@ -277,12 +234,46 @@ Highlight = {
 
         containerEl.find('[data-toggle="tooltip"]').tooltip({html: true});
 
-        console.log("Total matches: " + regExpMatches.length);
+        if (verbose) {
+            console.log("Total matches: " + regExpMatches.length);
+        }
 
         return id;
     },
+    getColorClass: function (map) {
+        var finalRGB = getColorFromName(map.matches[0].highlight.color);
+        if (map.matches.length > 1) {
+            for (var y = 1; y < map.matches.length; y++) {
+                finalRGB = mid(finalRGB, getColorFromName(map.matches[y].highlight.color));
+            }
+        }
+        var className = 'mab-hl-' + finalRGB.join('');
+        var dottedClassName = '.' + className;
+        if (Highlight._colorClassMap.indexOf(dottedClassName) === -1) {
+            // adds to the HEAD the generated classes with hover events and stuff
+            //var sheet = document.createStyleSheet();
 
 
+            var css = document.createElement('style');
+            css.type = 'text/css';
+
+            var styles = dottedClassName + '{background-color: rgba(' + finalRGB.join(',') + ',0.6);}';
+            styles += dottedClassName + ":hover," +
+                dottedClassName + ":active," +
+                dottedClassName + ':focus{background-color: rgba(' + finalRGB.join(',') + ',1);}';
+
+            if (css.styleSheet) {
+                css.styleSheet.cssText = styles;
+            } else {
+                css.appendChild(document.createTextNode(styles));
+            }
+            document.getElementsByTagName("head")[0].appendChild(css);
+
+            Highlight._colorClassMap.push(dottedClassName);
+        }
+
+        return className;
+    }
 }
 
 function getColorFromName(colorName) {
@@ -318,5 +309,3 @@ function multiply(rgb1, rgb2) {
         result.push(Math.floor(rgb1[i] * rgb2[i] / 255));
     }
 }
-
-
